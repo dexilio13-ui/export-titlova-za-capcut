@@ -46,3 +46,8 @@ tmp-check/
 *.mp4
 *.mov
 !docs/*.mp4
+
+# stray test output
+backend/*.json
+!backend/package.json
+!backend/package-lock.json
