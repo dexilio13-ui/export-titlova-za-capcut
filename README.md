@@ -17,6 +17,7 @@ Plain HTML5 + CSS3 + vanilla JS frontend (GitHub Pages ready) · Node.js + Expre
 |---|---|
 | **Repo** | https://github.com/dexilio13-ui/export-titlova-za-capcut |
 | **Frontend (Pages)** | https://dexilio13-ui.github.io/export-titlova-za-capcut/ |
+| **Backend API** | https://export-titlova-za-capcut-1.onrender.com |
 
 > **Ako ti treba vodič korak-po-korak za početnike** (kako koristiti sajt, kako uvesti titlove u CapCut, kako sam podesi svoj deploy) — vidi **[docs/VODIC-ZA-POCETNIKE.md](docs/VODIC-ZA-POCETNIKE.md)**.
 

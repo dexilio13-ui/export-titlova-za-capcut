@@ -8,7 +8,7 @@
  * If you serve the frontend and backend from the same origin, use "" (empty string).
  */
 window.APP_CONFIG = {
-  API_BASE_URL: "https://export-titlova-za-capcut.onrender.com",
+  API_BASE_URL: "https://export-titlova-za-capcut-1.onrender.com",
 
   // Optional overrides — safe to leave as-is.
   APP_NAME: "Export titlova za CapCut",
