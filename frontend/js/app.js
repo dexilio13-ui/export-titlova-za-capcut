@@ -12,7 +12,8 @@
   const state = {
     file: null,
     videoDuration: null,
-    maxMB: 25,
+    maxMB: null, // learned from the backend; null = not known yet
+    limitsKnown: false,
     movSupport: null,
     language: "sr",
     result: null, // { filename, language, segments: [{id,start,end,text}], words: [] }
@@ -29,25 +30,54 @@
     refreshLimits();
   });
 
-  function refreshLimits() {
-    UploadLib.fetchLimits().then(function (info) {
-      if (!info) {
+  /**
+   * Reads the real upload limits from the backend.
+   *
+   * A free-tier backend can take 30-60 s to answer on a cold start, so while
+   * we are still waiting we must NOT enforce a guessed limit — otherwise a
+   * 200 MB video gets rejected before it is even uploaded. Until the limits
+   * are known we let the file through and let the server decide (it enforces
+   * the real cap anyway and answers with a clear message).
+   */
+  async function refreshLimits(attempt) {
+    attempt = attempt || 1;
+    if (!state.limitsKnown && UI.elements.limitNote) {
+      UI.elements.limitNote.textContent = "Proveravam dostupne limite…";
+    }
+
+    const info = await UploadLib.fetchLimits();
+
+    if (!info) {
+      // Retry a few times: the most common cause is a cold start, not an outage.
+      if (attempt < 4) {
+        await new Promise((r) => setTimeout(r, attempt * 2000));
+        return refreshLimits(attempt + 1);
+      }
+      if (UI.elements.limitNote) {
         UI.elements.limitNote.textContent =
-          "Backend offline — set API_BASE_URL in js/config.js";
-        return;
+          "Backend se ne odziva — limit proverava server pri uploadovanja";
       }
-      if (info.maxFileSizeMB) {
-        state.maxMB = info.maxUploadMB || info.maxFileSizeMB;
-        const ffmpeg = info.ffmpeg !== false && info.movSupport !== false;
-        state.movSupport = ffmpeg;
-        UI.elements.limitNote.textContent = ffmpeg
-          ? "MP4 ili MOV · do " + (info.maxUploadMB || info.maxFileSizeMB) +
-            " MB · zvuk se izdvaja automatski"
-          : "Max file size: " + info.maxFileSizeMB + " MB · MP4 only";
-      } else {
-        state.movSupport = info.movSupport;
+      return; // limits stay unknown → no client-side size blocking
+    }
+
+    state.limitsKnown = true;
+    state.movSupport = info.ffmpeg !== false && info.movSupport !== false;
+    if (info.maxFileSizeMB) {
+      state.maxMB = info.maxUploadMB || info.maxFileSizeMB;
+    }
+    if (UI.elements.limitNote) {
+      UI.elements.limitNote.textContent = state.movSupport
+        ? "MP4 ili MOV · do " + state.maxMB + " MB · zvuk se izdvaja automatski"
+        : "Max file size: " + state.maxMB + " MB · MP4 only";
+    }
+
+    // A file picked while the limits were unknown may now be too large.
+    if (state.file && state.maxMB) {
+      const check = UploadLib.validateFile(state.file, state.maxMB);
+      if (!check.ok) {
+        UI.showError("Upload blocked", UploadLib.friendlyError(check.reason, check.maxMB));
       }
-    });
+    }
   }
 
   /* ── Upload flow ───────────────────────────────────────────────────── */
@@ -111,7 +141,8 @@
   function selectFile(file) {
     UI.hideError();
 
-    const v = UploadLib.validateFile(file, state.maxMB);
+    // Only enforce a size cap we actually know; otherwise the server decides.
+    const v = UploadLib.validateFile(file, state.limitsKnown ? state.maxMB : 0);
     if (!v.ok) {
       UI.showError("Upload blocked", UploadLib.friendlyError(v.reason, v.maxMB));
       return;

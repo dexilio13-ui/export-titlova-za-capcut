@@ -39,7 +39,17 @@ function errorHandler(err, req, res, next) {
     stack: err && err.stack,
   });
 
-  res.status(statusCode).json({ success: false, error: safeMessage, code });
+  // Include the real caps so the UI can show an accurate number instead of guessing.
+  const body = { success: false, error: safeMessage, code };
+  try {
+    const { getLimits } = require('../utils/limits');
+    const limits = getLimits(process.env);
+    body.maxFileSizeMB = limits.maxFileSizeMB;
+    body.maxUploadMB = limits.maxUploadMB;
+  } catch (_) {
+    /* limits are optional context only */
+  }
+  res.status(statusCode).json(body);
 }
 
 module.exports = { notFound, errorHandler };
