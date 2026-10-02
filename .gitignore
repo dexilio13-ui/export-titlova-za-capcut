@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Environment variables (NEVER commit these)
+.env
+.env.*
+!.env.example
+
+# Secrets & keys — never commit any of these
+*.key
+*.pem
+api.txt
+api-*.txt
+secrets*.txt
+gsk_*.txt
+
+# Uploaded files / runtime data
+backend/uploads/
+uploads/
+logs/
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Backend runtime
+backend/data/
+*.tsbuildinfo

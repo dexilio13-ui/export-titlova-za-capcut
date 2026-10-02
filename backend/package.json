@@ -1,0 +1,28 @@
+{
+  "name": "serbian-transcriber-backend",
+  "version": "1.0.0",
+  "description": "Node.js + Express backend for Serbian Transcriber. Receives MP4/MOV uploads, calls Groq Speech-to-Text (Whisper), returns normalized segment/word timestamps.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "whisper",
+    "groq",
+    "srt",
+    "serbian",
+    "transcription",
+    "subtitles"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^2.0.0"
+  }
+}

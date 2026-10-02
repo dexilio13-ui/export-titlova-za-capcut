@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>About – Export titlova za CapCut</title>
+  <meta name="description" content="What Export titlova za CapCut is, how the SRT subtitle workflow works, and the technology behind it." />
+  <meta name="theme-color" content="#0a0e1a" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%99%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="bg" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-blob bg-blob-1"></div>
+    <div class="bg-blob bg-blob-2"></div>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="./index.html" aria-label="Serbian Transcriber home">
+      <span class="brand-mark" aria-hidden="true">ST</span>
+      <span class="brand-name">Export titlova za&nbsp;CapCut</span>
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="./index.html">Home</a>
+      <a href="./about.html" aria-current="page">About</a>
+      <a href="./privacy.html">Privacy</a>
+    </nav>
+  </header>
+
+  <main id="main" class="prose-page">
+    <h1>About</h1>
+    <p>
+      <strong>Export titlova za CapCut</strong> (Serbian Transcriber) turns Serbian speech from
+      MP4 and MOV videos into downloadable SRT subtitles you can import straight into CapCut,
+      plus clean plain text — built for TikTok, YouTube Shorts, Instagram Reels, interviews and podcasts.
+    </p>
+
+    <h2>Workflow: video → titlove → CapCut</h2>
+    <ol>
+      <li>Upload the video here.</li>
+      <li>Click <strong>Download SRT</strong> — you get a file named like <code>video.sr.srt</code>.</li>
+      <li>In CapCut: <strong>Text → Import subtitles → Import file</strong> and pick the .srt.</li>
+      <li>CapCut splits the timeline for you; then style, animate and export.</li>
+    </ol>
+    <p class="muted">
+      Timestamps come straight from the model, so the timing matches the audio. Edits you make
+      here before download are reflected in the file CapCut imports.
+    </p>
+
+    <h2>How it works</h2>
+    <ol>
+      <li>You drop in a video (MP4 or MOV).</li>
+      <li>Your browser uploads it over HTTPS to our API server.</li>
+      <li>The server sends the audio to Groq's Whisper speech-to-text model.</li>
+      <li>You get segment- and word-level timestamps, rendered as editable lines.</li>
+      <li>Download a valid SRT, a clean TXT, or copy any line.</li>
+    </ol>
+
+    <h2>Technology</h2>
+    <ul>
+      <li>Frontend: plain HTML5 + CSS3 + vanilla JavaScript (GitHub Pages friendly).</li>
+      <li>Backend: Node.js + Express, with the API key kept strictly server-side.</li>
+      <li>Speech recognition: Groq Speech-to-Text (Whisper large-v3 / large-v3-turbo).</li>
+    </ul>
+
+    <h2>Serbian first</h2>
+    <p>
+      Serbian Latin and Cyrillic, diacritics (č ć š ž đ), natural punctuation — the output
+      preserves whatever script the model recognizes. You can also hint the language:
+      Serbian, English, Croatian, Bosnian or Montenegrin.
+    </p>
+
+    <h2>Editing</h2>
+    <p>
+      Every line can be edited before download. Timestamps stay untouched unless you
+      explicitly change them. "Regenerate SRT" and "Regenerate TXT" rebuild files from the
+      current on-screen content.
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <p>Serbian Transcriber — data privacy first.</p>
+    <nav aria-label="Footer navigation">
+      <a href="./index.html">Home</a> ·
+      <a href="./privacy.html">Privacy</a>
+    </nav>
+  </footer>
+</body>
+</html>

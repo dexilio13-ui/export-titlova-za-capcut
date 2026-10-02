@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Export titlova za CapCut – Serbian Speech to Text</title>
+  <meta name="description" content="Transcribe Serbian speech from MP4 and MOV videos and export SRT subtitles you can import straight into CapCut, plus clean plain text." />
+  <meta name="theme-color" content="#0a0e1a" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Export titlova za CapCut – Serbian Speech to Text" />
+  <meta property="og:description" content="Transcribe Serbian speech from MP4 and MOV videos and export SRT subtitles ready to import into CapCut." />
+  <meta property="og:site_name" content="Export titlova za CapCut" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Export titlova za CapCut – Serbian Speech to Text" />
+  <meta name="twitter:description" content="Transcribe Serbian speech from MP4 and MOV videos and export SRT subtitles ready to import into CapCut." />
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%99%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Ambient background: pure CSS, no canvas, no heavy libs -->
+  <div class="bg" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-blob bg-blob-1"></div>
+    <div class="bg-blob bg-blob-2"></div>
+    <div class="bg-blob bg-blob-3"></div>
+    <div class="bg-glow" id="mouseGlow"></div>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="./index.html" aria-label="Serbian Transcriber home">
+      <span class="brand-mark" aria-hidden="true">ST</span>
+      <span class="brand-name">Export titlova za&nbsp;CapCut</span>
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="./index.html" aria-current="page">Home</a>
+      <a href="./about.html">About</a>
+      <a href="./privacy.html">Privacy</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <!-- ── Hero ─────────────────────────────────────────────────────── -->
+    <section class="hero">
+      <p class="hero-eyebrow">CapCut-ready SRT titlove</p>
+      <h1 class="hero-title">
+        <span class="hero-line">SERBIAN</span>
+        <span class="hero-line hero-gradient">SPEECH&nbsp;→&nbsp;TEXT</span>
+      </h1>
+      <p class="hero-sub">Brza transkripcija srpskog govora u SRT titlove koje možeš odmah uvesti u CapCut — i čist tekst za lepljenje.</p>
+    </section>
+
+    <!-- ── Upload card ──────────────────────────────────────────────── -->
+    <section class="card upload-card" aria-labelledby="uploadTitle">
+      <h2 id="uploadTitle" class="visually-hidden">Upload video</h2>
+
+      <div class="controls-row">
+        <label class="field">
+          <span class="field-label" id="langLabel">Language / Jezik</span>
+          <select id="languageSelect" aria-labelledby="langLabel">
+            <option value="auto">Auto</option>
+            <option value="sr" selected>Serbian</option>
+            <option value="en">English</option>
+            <option value="hr">Croatian</option>
+            <option value="bs">Bosnian</option>
+            <option value="me">Montenegrin</option>
+          </select>
+        </label>
+        <p class="limit-note" id="limitNote">Max file size: — MB</p>
+      </div>
+
+      <div id="dropzone" class="dropzone" role="button" tabindex="0"
+           aria-labelledby="dzTitle" aria-describedby="dzSub dzHint">
+        <div class="dz-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor"
+               stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 16V4m0 0l-4 4m4-4l4 4" />
+            <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+          </svg>
+        </div>
+        <p class="dz-title" id="dzTitle">Prevuci video ovde</p>
+        <p class="dz-sub" id="dzSub">MP4 ili MOV • Serbian speech-to-text</p>
+        <p class="dz-hint" id="dzHint">Drop your video here — or click to browse</p>
+        <button type="button" id="chooseBtn" class="btn btn-primary">Choose video</button>
+        <input type="file" id="fileInput" accept=".mp4,.mov,video/mp4,video/quicktime" hidden />
+      </div>
+
+      <div id="fileInfo" class="file-info" hidden>
+        <div class="file-meta">
+          <span class="file-name" id="fileName">video.mp4</span>
+          <span class="file-size" id="fileSize">— MB</span>
+          <span class="file-duration" id="fileDuration" hidden>—</span>
+          <button type="button" id="clearFileBtn" class="btn-ghost" aria-label="Remove selected video">✕</button>
+        </div>
+        <video id="videoPreview" class="video-preview" controls muted preload="metadata" hidden></video>
+      </div>
+
+      <div id="progressArea" class="progress-area" hidden>
+        <p class="status-text" id="statusText" role="status" aria-live="polite">Uploading…</p>
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Processing progress" id="progressBar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <p class="progress-pct" id="progressPct">0%</p>
+        <ol class="steps" id="stepsList">
+          <li data-step="uploading">Uploading</li>
+          <li data-step="preparing">Preparing audio</li>
+          <li data-step="transcribing">Transcribing</li>
+          <li data-step="subtitles">Creating subtitles</li>
+          <li data-step="done">Finished</li>
+        </ol>
+      </div>
+
+      <div id="errorBox" class="error-box" role="alert" hidden>
+        <strong id="errorTitle">Something went wrong</strong>
+        <p id="errorMessage"></p>
+        <button type="button" id="dismissErrorBtn" class="btn-ghost" aria-label="Dismiss error">✕</button>
+      </div>
+
+      <button type="button" id="startBtn" class="btn btn-primary btn-lg" disabled hidden>
+        Transcribe video
+      </button>
+    </section>
+
+    <!-- ── Results ──────────────────────────────────────────────────── -->
+    <section id="resultsSection" class="results" hidden aria-labelledby="resultsTitle">
+      <div class="results-head">
+        <h2 id="resultsTitle">TRANSCRIPTION</h2>
+        <div class="results-actions">
+          <button type="button" id="downloadSrtBtn" class="btn btn-primary">Download SRT</button>
+          <button type="button" id="downloadTxtBtn" class="btn">Download TXT</button>
+          <button type="button" id="copyAllBtn" class="btn">Copy all</button>
+          <button type="button" id="newVideoBtn" class="btn btn-ghost">New video</button>
+        </div>
+      </div>
+
+      <div class="results-toolbar">
+        <label class="toggle">
+          <input type="checkbox" id="timestampsToggle" checked />
+          <span>Show timestamps</span>
+        </label>
+        <span class="meta-line" id="metaLine"></span>
+      </div>
+
+      <div class="transcript" id="transcript" role="list" aria-label="Transcription lines"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Export titlova za CapCut (Serbian Transcriber) — data privacy first. Videos are processed in memory and never stored.</p>
+    <nav aria-label="Footer navigation">
+      <a href="./about.html">About</a> ·
+      <a href="./privacy.html">Privacy</a>
+    </nav>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/transcription.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/upload.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
