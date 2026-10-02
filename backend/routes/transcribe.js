@@ -14,7 +14,7 @@ const path = require('path');
 
 const { AppError } = require('../utils/errors');
 const logger = require('../utils/logger');
-const { getLimits, decideMediaAction, rejectionMessage, extractionFailureMessage, MB } = require('../utils/limits');
+const { getLimits, planMedia, rejectionMessage, extractionFailureMessage, MB } = require('../utils/limits');
 const { createTempStorage, tempPathFor, removeFile, removeRequestTemp } = require('../utils/tempFiles');
 const { hasFfmpeg, probeDuration, extractAudio, probeVideoCodec, needsVideoStrip } = require('../services/audio');
 const { transcribe } = require('../services/groq');
@@ -122,37 +122,29 @@ router.post('/transcribe', async (req, res, next) => {
     let audioPath = null;
 
     try {
-      const action = decideMediaAction({
+      // Phones record HEVC/H.265, VP9 or AV1; the transcription API only wants
+      // audio, so the video track is dropped whenever we can.
+      const videoNeedsStrip = canExtract ? needsVideoStrip(probeVideoCodec(uploadedPath)) : false;
+      const plan = planMedia({
         extension: ext,
         sizeBytes: req.file.size,
         limits: LIMITS,
         canExtract: canExtract,
+        videoNeedsStrip: videoNeedsStrip,
       });
 
-      // Phones record HEVC/H.265, VP9 or AV1. Those files are small, so they
-      // would be forwarded untouched and rejected by the API — strip the video
-      // and send the audio track instead.
-      let plan = action.action;
-      if (plan === 'accept' && canExtract) {
-        const videoCodec = probeVideoCodec(uploadedPath);
-        if (needsVideoStrip(videoCodec)) {
-          logger.info('Extracting audio for unsupported video codec', { codec: videoCodec });
-          plan = 'extract';
-        }
-      }
-
-      if (plan === 'reject') {
+      if (plan.action === 'reject') {
         throw new AppError(
-          action.reason === 'mov' ? 415 : 413,
-          rejectionMessage(action.reason, LIMITS),
-          { code: action.reason === 'mov' ? 'MOV_UNAVAILABLE' : 'FILE_TOO_LARGE' }
+          plan.reason === 'mov' ? 415 : 413,
+          rejectionMessage(plan.reason, LIMITS),
+          { code: plan.reason === 'mov' ? 'MOV_UNAVAILABLE' : 'FILE_TOO_LARGE' }
         );
       }
 
       let fileForGroq = uploadedPath;
       let conversion = null;
 
-      if (plan === 'extract') {
+      if (plan.action === 'extract') {
         const startedExtract = Date.now();
         let info;
         try {

@@ -123,6 +123,7 @@ The app uses the current Speech-to-Text endpoint `POST https://api.groq.com/open
 | `GROQ_MODEL` | — | `whisper-large-v3-turbo` | `whisper-large-v3` for max accuracy. |
 | `FFMPEG_PATH` | — | auto-detected | Absolute path to `ffmpeg`. Enables `.mov` + oversized videos. The Docker image sets `/usr/bin/ffmpeg`. |
 | `FFMPEG_TIMEOUT_MS` | — | `300000` | Abort audio conversion after this long. |
+| `ALWAYS_EXTRACT_AUDIO` | — | `true` | Send only the audio track to the API. Set `false` to forward small MP4s untouched. |
 | `NODE_ENV` | — | `development` | Set to `production` in deployment (enables strict CORS). |
 
 `.env` is git-ignored. **Never commit it.**
@@ -154,12 +155,14 @@ Render free services sleep after inactivity — the first request may take ~30 s
 
 ### What ffmpeg buys you
 
-With `FFMPEG_PATH` set (or the Docker image), the backend extracts a compact **mono 16 kHz Opus** track before calling Groq:
+The transcription API only ever needs audio, so the default policy (`ALWAYS_EXTRACT_AUDIO=true`) is to strip the video track first and send audio only:
 
-- `.mov` files work, even though Groq itself does not accept MOV
-- a 300 MB video becomes roughly 2–15 MB of audio, comfortably inside the 25 MB Groq cap
+- `.mov` works, even though the API itself does not accept MOV
+- phone codecs work (iPhone HEVC/H.265, Android VP9/AV1) instead of failing
+- a 300 MB video becomes roughly 2–15 MB of audio, comfortably inside the Groq cap
 - ~14 MB of audio per hour, so hour-long interviews and podcasts fit
-- if extraction fails (e.g. the clip is muted), the user gets a clear message instead of a stack trace
+- if the audio track already is a compact codec (AAC/Opus/MP3) it is **copied, not re-encoded** — on a small instance that is the difference between ~2 s and ~20 s
+- if extraction fails (muted clip), the user gets a clear message instead of a stack trace
 
 ## GitHub Pages deployment (frontend)
 
