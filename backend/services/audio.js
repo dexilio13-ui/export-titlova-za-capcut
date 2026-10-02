@@ -114,30 +114,92 @@ function run(bin, args, timeoutMs) {
 }
 
 /**
- * Extracts a compact mono 16 kHz audio track for speech recognition.
- * Prefers Opus in OGG (~14 MB per hour, accepted by Groq), falls back to MP3.
- *
- * @param {string} srcPath  uploaded media (temp file)
- * @param {string} dstPath  destination file (caller owns cleanup)
- * @returns {Promise<{path: string, codec: string, bytes: number}>}
+ * Codecs whose audio track can be copied straight out of the container
+ * (no re-encode). Remuxing is I/O-bound and near-instant, while re-encoding
+ * costs real CPU — on a small instance that difference is the whole runtime.
  */
-async function extractAudio(srcPath, dstPath) {
+const COPYABLE_CODECS = new Set(['aac', 'mp3', 'opus', 'vorbis', 'alac']);
+
+/**
+ * Reads the first audio stream's codec with ffprobe (null when unknown).
+ * @param {string} filePath
+ * @returns {{codecName: string, bitRate: number|null}|null}
+ */
+function probeAudioStream(filePath) {
+  const ffprobe = resolveFfprobe();
+  if (!ffprobe) return null;
+  try {
+    const out = execFileSync(
+      ffprobe,
+      ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name,bit_rate',
+        '-of', 'default=noprint_wrappers=1:nokey=1', filePath],
+      { timeout: 20000, encoding: 'utf8' }
+    );
+    const lines = String(out).trim().split('\n').map((l) => l.trim()).filter(Boolean);
+    const codecName = (lines.find((l) => !l.includes('=')) || '').toLowerCase();
+    const bitRateLine = lines.find((l) => l.startsWith('bit_rate='));
+    const bitRate = bitRateLine ? parseInt(bitRateLine.split('=')[1], 10) : null;
+    if (!codecName || codecName === 'unknown' || codecName === 'n/a') return null;
+    return { codecName, bitRate: Number.isFinite(bitRate) ? bitRate : null };
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Decides how to get audio out of the uploaded media.
+ * Pure function so the policy can be unit tested.
+ * @param {{codecName: string}|null} stream
+ * @returns {'copy'|'encode'}
+ */
+function chooseStrategy(stream) {
+  if (stream && COPYABLE_CODECS.has(stream.codecName)) return 'copy';
+  return 'encode';
+}
+
+/**
+ * Extracts a usable audio track for speech recognition.
+ *
+ * Strategy:
+ *  1. remux the existing audio track without re-encoding (fast) when its codec
+ *     is already compact and friendly to Groq;
+ *  2. otherwise encode mono 16 kHz Opus (~14 MB/hour), with MP3 as a fallback.
+ *
+ * @param {string} srcPath   uploaded media (temp file)
+ * @param {string} dstPath   destination file (caller owns cleanup)
+ * @param {{maxBytes?: number}} opts when the copy would exceed the cap, we encode
+ * @returns {Promise<{path: string, codec: string, bytes: number, strategy: string}>}
+ */
+async function extractAudio(srcPath, dstPath, opts = {}) {
   const ffmpeg = resolveFfmpeg();
   if (ffmpeg === false) throw new Error('ffmpeg not available');
 
   const timeoutMs = parseInt(process.env.FFMPEG_TIMEOUT_MS || '300000', 10);
-  const base = dstPath.replace(/\.(ogg|mp3)$/i, '');
-  const attempts = [
-    { out: base + '.ogg', codec: 'libopus', args: ['-c:a', 'libopus', '-b:a', '32k'] },
-    { out: base + '.mp3', codec: 'libmp3lame', args: ['-c:a', 'libmp3lame', '-b:a', '48k'] },
-  ];
+  const maxBytes = opts.maxBytes || Infinity;
+  const base = dstPath.replace(/\.(ogg|mp3|m4a)$/i, '');
+  const common = ['-y', '-i', srcPath, '-vn', '-map', '0:a:0'];
+
+  const attempts = [];
+  if (chooseStrategy(probeAudioStream(srcPath)) === 'copy') {
+    attempts.push({ out: base + '.m4a', codec: 'copy', strategy: 'copy', args: ['-c:a', 'copy'] });
+  }
+  attempts.push(
+    { out: base + '.ogg', codec: 'libopus', strategy: 'encode', args: ['-ac', '1', '-ar', '16000', '-c:a', 'libopus', '-b:a', '32k'] },
+    { out: base + '.mp3', codec: 'libmp3lame', strategy: 'encode', args: ['-ac', '1', '-ar', '16000', '-c:a', 'libmp3lame', '-b:a', '48k'] }
+  );
 
   let lastError = null;
   for (const attempt of attempts) {
     try {
-      await run(ffmpeg, ['-y', '-i', srcPath, '-vn', '-map', '0:a:0', '-ac', '1', '-ar', '16000', ...attempt.args, attempt.out], timeoutMs);
+      await run(ffmpeg, [...common, ...attempt.args, attempt.out], timeoutMs);
       const bytes = fs.statSync(attempt.out).size;
-      return { path: attempt.out, codec: attempt.codec, bytes };
+      if (bytes > maxBytes) {
+        // Remuxed track is still too big for the transcription API → re-encode.
+        logger.warn('copied audio too large, falling back to encoding', { bytes });
+        try { fs.unlinkSync(attempt.out); } catch (_) { /* ignore */ }
+        continue;
+      }
+      return { path: attempt.out, codec: attempt.codec, bytes, strategy: attempt.strategy };
     } catch (err) {
       lastError = err;
       logger.warn('audio extraction attempt failed', { codec: attempt.codec, message: err.message });
@@ -146,4 +208,12 @@ async function extractAudio(srcPath, dstPath) {
   throw lastError || new Error('audio extraction failed');
 }
 
-module.exports = { resolveFfmpeg, hasFfmpeg, resolveFfprobe, probeDuration, extractAudio };
+module.exports = {
+  resolveFfmpeg,
+  hasFfmpeg,
+  resolveFfprobe,
+  probeDuration,
+  probeAudioStream,
+  chooseStrategy,
+  extractAudio,
+};

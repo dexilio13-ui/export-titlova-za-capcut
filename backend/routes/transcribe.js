@@ -133,7 +133,9 @@ router.post('/transcribe', async (req, res, next) => {
         const startedExtract = Date.now();
         let info;
         try {
-          info = await extractAudio(uploadedPath, tempPathFor('.ogg'));
+          info = await extractAudio(uploadedPath, tempPathFor('.ogg'), {
+            maxBytes: LIMITS.maxFileSizeMB * MB,
+          });
         } catch (err) {
           // Technical detail stays in the log; the user gets a useful hint.
           logger.error('Audio extraction failed', { message: err.message });
@@ -153,6 +155,7 @@ router.post('/transcribe', async (req, res, next) => {
 
         logger.info('Audio extracted', {
           codec: info.codec,
+          strategy: info.strategy,
           mb: (info.bytes / MB).toFixed(1),
           ms: Date.now() - startedExtract,
         });
