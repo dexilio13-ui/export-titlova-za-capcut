@@ -31,3 +31,7 @@ Thumbs.db
 # Backend runtime
 backend/data/
 *.tsbuildinfo
+
+# Local test media and keys (never commit)
+backend/testmedia/
+testmedia/
