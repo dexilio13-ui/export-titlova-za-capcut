@@ -15,7 +15,7 @@ const path = require('path');
 const { AppError } = require('../utils/errors');
 const logger = require('../utils/logger');
 const { getLimits, decideMediaAction, rejectionMessage, extractionFailureMessage, MB } = require('../utils/limits');
-const { createTempStorage, tempPathFor, removeFile } = require('../utils/tempFiles');
+const { createTempStorage, tempPathFor, removeFile, removeRequestTemp } = require('../utils/tempFiles');
 const { hasFfmpeg, probeDuration, extractAudio } = require('../services/audio');
 const { transcribe } = require('../services/groq');
 
@@ -68,21 +68,32 @@ router.get('/health', (req, res) => {
 router.post('/transcribe', (req, res, next) => {
   upload.single('video')(req, res, (err) => {
     if (!err) return next();
-    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-      // Multer aborted the stream — remove whatever landed on disk.
-      if (req.file) removeFile(req.file.path);
-      return next(
-        new AppError(
-          413,
-          `File is too large. The maximum accepted upload is ${LIMITS.maxUploadMB} MB.`,
-          { code: 'FILE_TOO_LARGE' }
-        )
-      );
-    }
-    if (err instanceof multer.MulterError && err.code === 'LIMIT_UNEXPECTED_FILE') {
-      return next(new AppError(400, 'Invalid upload. Use the "video" field for your file.', { code: 'BAD_FIELD' }));
-    }
-    next(err);
+
+    // The client can vanish mid-upload (free-tier host recycling, weak mobile
+    // signal). Multer then reports a truncated form: that is not our bug, and
+    // whatever landed on disk must go.
+    const aborted =
+      err.code === 'ECONNRESET' ||
+      err.code === 'EPIPE' ||
+      /unexpected end of form|aborted|ECONNRESET|premature close/i.test(err.message || '');
+
+    removeRequestTemp(req).then(() => {
+      if (aborted) {
+        logger.warn('Upload aborted by client', { path: req.originalUrl });
+        return next(new AppError(400, 'Upload was interrupted. Please try again.', { code: 'UPLOAD_ABORTED' }));
+      }
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        return next(
+          new AppError(413, `File is too large. The maximum accepted upload is ${LIMITS.maxUploadMB} MB.`, {
+            code: 'FILE_TOO_LARGE',
+          })
+        );
+      }
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return next(new AppError(400, 'Invalid upload. Use the "video" field for your file.', { code: 'BAD_FIELD' }));
+      }
+      next(err);
+    });
   });
 });
 
@@ -184,6 +195,8 @@ router.post('/transcribe', async (req, res, next) => {
     } finally {
       await removeFile(uploadedPath);
       if (audioPath) await removeFile(audioPath);
+      // Belt and braces: drop the whole per-request folder.
+      await removeRequestTemp(req);
     }
   } catch (err) {
     next(err);

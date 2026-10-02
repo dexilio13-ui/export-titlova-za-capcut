@@ -49,6 +49,8 @@
         return "No video file was selected.";
       case "network":
         return "Could not reach the server. Check your connection and the backend URL in js/config.js.";
+      case "upload_interrupted":
+        return "The connection dropped during upload. Press \"Try again\" — nothing was saved.";
       case "timeout":
         return "The server took too long to respond. Please try again.";
       case "server":
@@ -63,13 +65,40 @@
   }
 
   /**
+   * Did the upload die part-way (connection drop) or before it even started?
+   * Pure function so the behaviour is unit tested.
+   * @param {number} fractionSent 0..1 bytes already uploaded
+   * @param {boolean} exhausted retries already used
+   * @returns {string} error reason
+   */
+  function classifyNetworkFailure(fractionSent, exhausted) {
+    // Bytes were already moving: the server URL is fine, the link broke.
+    if (fractionSent > 0.01 || exhausted) return "upload_interrupted";
+    return "network";
+  }
+
+  /** Backoff before retrying an upload: 1s, then 3s. */
+  function retryDelay(attempt) {
+    return attempt <= 1 ? 1000 : 3000;
+  }
+
+  /**
    * Uploads the video via XHR so we get upload progress events.
+   *
+   * Free-tier hosts recycle instances and home networks drop connections, so
+   * a single dropped upload is retried automatically before giving up.
+   *
    * @param {File} file
    * @param {string} language selector value
-   * @param {{onProgress?: function(number):void}} handlers
+   * @param {{onProgress?: function(number):void, onRetry?: function(number):void}} handlers
+   * @param {number} [attempt] internal
    * @returns {Promise<object>} normalized transcription JSON from the backend
    */
-  function uploadVideo(file, language, handlers) {
+  function uploadVideo(file, language, handlers, attempt) {
+    attempt = attempt || 1;
+    const MAX_ATTEMPTS = 2;
+    let sent = 0;
+
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", getApiBase() + "/api/transcribe", true);
@@ -77,10 +106,26 @@
       xhr.timeout = 10 * 60 * 1000; // long videos may take a while
 
       xhr.upload.onprogress = function (e) {
-        if (e.lengthComputable && handlers && typeof handlers.onProgress === "function") {
-          handlers.onProgress(e.loaded / e.total);
+        if (e.lengthComputable) {
+          sent = e.loaded / e.total;
+          if (handlers && typeof handlers.onProgress === "function") handlers.onProgress(sent);
         }
       };
+
+      function retryOrFail() {
+        const exhausted = attempt >= MAX_ATTEMPTS;
+        if (!exhausted && classifyNetworkFailure(sent, false) === "upload_interrupted") {
+          if (handlers && typeof handlers.onRetry === "function") handlers.onRetry(attempt);
+          setTimeout(function () {
+            uploadVideo(file, language, handlers, attempt + 1).then(resolve, reject);
+          }, retryDelay(attempt));
+          return;
+        }
+        const reason = classifyNetworkFailure(sent, exhausted);
+        const err = new Error(friendlyError(reason));
+        err.reason = reason;
+        reject(err);
+      }
 
       xhr.onload = function () {
         let body = xhr.response;
@@ -102,19 +147,14 @@
           NO_SPEECH: "no_speech",
           MOV_UNAVAILABLE: "mov_unavailable",
         };
-        let reason = map[code] || (xhr.status === 0 ? "network" : xhr.status >= 500 ? "server" : "default");
-        if (reason === "too_large" && body && body.maxFileSizeMB) {
-          reason = "too_large";
-        }
-        const maxMB = (body && body.maxFileSizeMB) || 25;
+        const reason = map[code] || (xhr.status === 0 ? "network" : xhr.status >= 500 ? "server" : "default");
+        const maxMB = (body && body.maxUploadMB) || (body && body.maxFileSizeMB) || 25;
         const err = new Error(friendlyError(reason, maxMB));
         err.reason = reason;
         reject(err);
       };
 
-      xhr.onerror = function () {
-        reject(new Error(friendlyError("network")));
-      };
+      xhr.onerror = retryOrFail;
       xhr.ontimeout = function () {
         reject(new Error(friendlyError("timeout")));
       };
@@ -143,6 +183,8 @@
   window.UploadLib = {
     validateFile: validateFile,
     friendlyError: friendlyError,
+    classifyNetworkFailure: classifyNetworkFailure,
+    retryDelay: retryDelay,
     uploadVideo: uploadVideo,
     fetchLimits: fetchLimits,
     getApiBase: getApiBase,

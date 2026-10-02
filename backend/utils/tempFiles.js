@@ -35,18 +35,44 @@ function tempPathFor(ext) {
   return filePath;
 }
 
-/** Multer disk storage: random safe names, no user-controlled paths. */
+/**
+ * Multer disk storage: each request gets its own random subdirectory.
+ *
+ * When a client disconnects mid-upload the request still lands in this folder,
+ * so cleanup is a single recursive delete — no orphaned partial files filling
+ * the (ephemeral) disk.
+ */
 function createTempStorage() {
   const multer = require('multer');
   return multer.diskStorage({
     destination(req, file, cb) {
       ensureUploadDir();
-      cb(null, UPLOAD_DIR);
+      let dir;
+      try {
+        dir = path.join(UPLOAD_DIR, crypto.randomBytes(10).toString('hex'));
+        fs.mkdirSync(dir, { recursive: true });
+      } catch (err) {
+        return cb(err);
+      }
+      req.tempDir = dir;
+      cb(null, dir);
     },
     filename(req, file, cb) {
-      cb(null, path.basename(tempPathFor(safeExt(file.originalname))));
+      cb(null, 'upload' + safeExt(file.originalname));
     },
   });
+}
+
+/** Removes this request's whole temp directory (upload + extracted audio). */
+async function removeRequestTemp(req) {
+  if (!req || !req.tempDir) return;
+  const dir = req.tempDir;
+  req.tempDir = null;
+  try {
+    await fs.promises.rm(dir, { recursive: true, force: true });
+  } catch (_) {
+    /* already gone */
+  }
 }
 
 /** Deletes a temp file, ignoring "already gone". */
@@ -62,12 +88,15 @@ async function removeFile(filePath) {
 /** Deletes stray temp files older than 1 hour (crash recovery). */
 function sweepOldFiles() {
   try {
-    const files = fs.readdirSync(UPLOAD_DIR);
+    const entries = fs.readdirSync(UPLOAD_DIR, { withFileTypes: true });
     const cutoff = Date.now() - 60 * 60 * 1000;
-    for (const f of files) {
-      const p = path.join(UPLOAD_DIR, f);
+    for (const entry of entries) {
+      const p = path.join(UPLOAD_DIR, entry.name);
       try {
-        if (fs.statSync(p).mtimeMs < cutoff) fs.unlinkSync(p);
+        if (fs.statSync(p).mtimeMs < cutoff) {
+          if (entry.isDirectory()) fs.rmSync(p, { recursive: true, force: true });
+          else fs.unlinkSync(p);
+        }
       } catch (_) {
         /* ignore */
       }
@@ -84,5 +113,6 @@ module.exports = {
   tempPathFor,
   createTempStorage,
   removeFile,
+  removeRequestTemp,
   sweepOldFiles,
 };
