@@ -35,3 +35,6 @@ backend/data/
 # Local test media and keys (never commit)
 backend/testmedia/
 testmedia/
+
+# Temporary screenshot workspace
+tmp-shots/
