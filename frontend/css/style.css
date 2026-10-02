@@ -75,18 +75,23 @@ body {
   100% { transform: translate(-3vmax, 2vmax) scale(0.97); }
 }
 
+/* Starts centred; JS then drives `transform` from the pointer position.
+   `left/top` stay at 0 so the JS offset is the only positioning applied —
+   otherwise the element keeps its base offset and drifts away from the cursor. */
 .bg-glow {
   position: absolute;
+  left: 0;
+  top: 0;
   width: 520px;
   height: 520px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(124, 92, 255, 0.14), transparent 60%);
-  transform: translate(-50%, -50%);
-  left: 50vw;
-  top: 30vh;
-  transition: opacity 0.4s ease;
+  opacity: 0;
+  transition: opacity 0.6s ease;
   will-change: transform;
 }
+
+.bg-glow.active { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .bg-blob, .bg-glow { animation: none; }

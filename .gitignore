@@ -38,3 +38,6 @@ testmedia/
 
 # Temporary screenshot workspace
 tmp-shots/
+
+# Local verification scratch
+tmp-check/

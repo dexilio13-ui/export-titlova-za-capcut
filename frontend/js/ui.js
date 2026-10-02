@@ -318,23 +318,46 @@
   function initMouseGlow() {
     if (!els.mouseGlow) return;
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Touch devices get a static glow; a light chasing a finger looks odd.
+    if (!matchMedia("(pointer: fine)").matches) return;
 
-    let tx = innerWidth / 2;
-    let ty = innerHeight / 3;
-    let x = tx;
-    let y = ty;
+    const SIZE = 520;
+    let tx = null;
+    let ty = null;
+    let x = innerWidth / 2;
+    let y = innerHeight / 3;
     let raf = null;
+    let idle = true;
+
+    // The glow is a 520px square; centring it on the cursor means offsetting
+    // by half its size. `left`/`top` are 0 in CSS so this is the only offset.
+    function place() {
+      els.mouseGlow.style.transform = `translate(${x - SIZE / 2}px, ${y - SIZE / 2}px)`;
+    }
+    place();
+
+    function tick() {
+      // Ease toward the pointer every frame so it keeps up with fast moves
+      // and settles smoothly instead of freezing when the pointer stops.
+      x += (tx - x) * 0.12;
+      y += (ty - y) * 0.12;
+      place();
+      if (Math.abs(tx - x) > 0.5 || Math.abs(ty - y) > 0.5) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        raf = null;
+        idle = true;
+      }
+    }
 
     addEventListener("pointermove", (e) => {
+      if (e.pointerType && e.pointerType !== "mouse") return;
       tx = e.clientX;
       ty = e.clientY;
-      if (!raf) {
-        raf = requestAnimationFrame(() => {
-          x += (tx - x) * 0.08;
-          y += (ty - y) * 0.08;
-          els.mouseGlow.style.transform = `translate(${x - 260}px, ${y - 260}px)`;
-          raf = null;
-        });
+      els.mouseGlow.classList.add("active");
+      if (idle) {
+        idle = false;
+        if (!raf) raf = requestAnimationFrame(tick);
       }
     }, { passive: true });
   }
