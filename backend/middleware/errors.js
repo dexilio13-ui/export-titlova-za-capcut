@@ -32,12 +32,21 @@ function errorHandler(err, req, res, next) {
     code = 'FILE_TOO_LARGE';
   }
 
-  // Full technical detail stays server-side only.
-  logger.error(`Request error: ${err && err.message}`, {
-    path: req.originalUrl,
-    code: err && err.code,
-    stack: err && err.stack,
-  });
+  // Client mistakes (wrong type, too large, no speech) are expected traffic,
+  // not incidents: log them as warnings so real failures stay visible.
+  if (statusCode >= 400 && statusCode < 500) {
+    logger.warn(`Client error (${statusCode}): ${safeMessage}`, {
+      path: req.originalUrl,
+      code: code,
+    });
+  } else {
+    // Full technical detail stays server-side only.
+    logger.error(`Request error: ${err && err.message}`, {
+      path: req.originalUrl,
+      code: err && err.code,
+      stack: err && err.stack,
+    });
+  }
 
   // Include the real caps so the UI can show an accurate number instead of guessing.
   const body = { success: false, error: safeMessage, code };
