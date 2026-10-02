@@ -153,7 +153,9 @@ function probeAudioStream(filePath) {
  * @returns {'copy'|'encode'}
  */
 function chooseStrategy(stream) {
-  if (stream && COPYABLE_CODECS.has(stream.codecName)) return 'copy';
+  if (stream && typeof stream.codecName === 'string') {
+    if (COPYABLE_CODECS.has(stream.codecName.trim().toLowerCase())) return 'copy';
+  }
   return 'encode';
 }
 
