@@ -1,0 +1,40 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploys the API as a Docker service (Dockerfile ships ffmpeg).
+# On Render: New → Blueprint → select this repo. Render reads this file.
+#
+# GROQ_API_KEY has `sync: false`, so Render asks you to paste the secret
+# into the dashboard instead of storing it in git.
+
+services:
+  - type: web
+    name: export-titlova-za-capcut-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: frankfurt
+    branch: main
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false # secret — enter in the Render dashboard
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: FFMPEG_PATH
+        value: /usr/bin/ffmpeg
+      - key: ALLOWED_ORIGINS
+        value: https://dexilio13-ui.github.io
+      # What Groq accepts (free tier = 25 MB). Larger media is converted to
+      # audio first, so this is the cap for the *converted* file.
+      - key: MAX_FILE_SIZE_MB
+        value: 25
+      # How big a video the browser may upload to us before conversion.
+      - key: MAX_UPLOAD_MB
+        value: 500
+      - key: GROQ_MODEL
+        value: whisper-large-v3-turbo

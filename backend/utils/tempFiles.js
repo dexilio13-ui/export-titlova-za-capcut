@@ -1,8 +1,12 @@
 'use strict';
 
 /**
- * Safe temporary-file helpers. Files live in backend/uploads with random names,
- * are never user-controlled, and are always cleaned up after transcription.
+ * Safe temporary-file helpers.
+ *
+ * Uploads are streamed to disk under random names inside backend/uploads, so
+ * large videos never sit in RAM and user input never influences a path.
+ * Files are deleted as soon as transcription finishes; a sweep removes
+ * anything older than 1 hour left behind by a crashed run.
  */
 
 const fs = require('fs');
@@ -15,34 +19,44 @@ function ensureUploadDir() {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-/**
- * @param {Buffer} buffer
- * @param {string} originalName only used to derive a safe extension
- * @returns {{dir: string, path: string, cleanup: () => Promise<void>}}
- */
-function writeTemp(buffer, originalName) {
+/** Sanitizes an extension to a short, safe suffix (".mp4"). */
+function safeExt(originalName) {
+  const raw = path.extname(originalName || '').toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 8);
+  if (!raw || raw === '.') return '.bin';
+  return raw;
+}
+
+/** Builds a unique path inside the upload dir without creating the file. */
+function tempPathFor(ext) {
   ensureUploadDir();
-  const ext = path.extname(originalName || '').toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 8);
-  const safeName = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}${ext}`;
-  const filePath = path.join(UPLOAD_DIR, safeName);
+  const name = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}${safeExt(ext)}`;
+  const filePath = path.join(UPLOAD_DIR, name);
+  if (!filePath.startsWith(UPLOAD_DIR + path.sep)) throw new Error('Invalid temp path');
+  return filePath;
+}
 
-  // Double-check the resolved path stays inside the upload dir (anti-traversal).
-  if (!filePath.startsWith(UPLOAD_DIR + path.sep)) {
-    throw new Error('Invalid temp path');
-  }
-
-  fs.writeFileSync(filePath, buffer);
-  return {
-    dir: UPLOAD_DIR,
-    path: filePath,
-    cleanup: async () => {
-      try {
-        await fs.promises.unlink(filePath);
-      } catch (_) {
-        /* already gone */
-      }
+/** Multer disk storage: random safe names, no user-controlled paths. */
+function createTempStorage() {
+  const multer = require('multer');
+  return multer.diskStorage({
+    destination(req, file, cb) {
+      ensureUploadDir();
+      cb(null, UPLOAD_DIR);
     },
-  };
+    filename(req, file, cb) {
+      cb(null, path.basename(tempPathFor(safeExt(file.originalname))));
+    },
+  });
+}
+
+/** Deletes a temp file, ignoring "already gone". */
+async function removeFile(filePath) {
+  if (!filePath) return;
+  try {
+    await fs.promises.unlink(filePath);
+  } catch (_) {
+    /* already gone */
+  }
 }
 
 /** Deletes stray temp files older than 1 hour (crash recovery). */
@@ -63,4 +77,12 @@ function sweepOldFiles() {
   }
 }
 
-module.exports = { writeTemp, sweepOldFiles, UPLOAD_DIR };
+module.exports = {
+  UPLOAD_DIR,
+  ensureUploadDir,
+  safeExt,
+  tempPathFor,
+  createTempStorage,
+  removeFile,
+  sweepOldFiles,
+};

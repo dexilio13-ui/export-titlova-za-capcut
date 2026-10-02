@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log*
+
+# Never bake secrets or local uploads into the image
+.env
+.env.*
+uploads
+testmedia
+
+# Tests are not needed at runtime
+test
+*.test.js
+
+Dockerfile
+.dockerignore

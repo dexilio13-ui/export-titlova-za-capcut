@@ -40,11 +40,11 @@
 
     <h2>What we do with it</h2>
     <ul>
-      <li>Your video is kept in server memory, written to a temporary file, and
+      <li>Your video is streamed to a temporary file on the server and
           <strong>deleted immediately after transcription</strong>.</li>
       <li>We do not store, copy, share or analyze your videos.</li>
-      <li>Only the audio track is sent to Groq's speech-to-text API when audio
-          extraction is needed.</li>
+      <li>Only the audio track is sent to Groq's speech-to-text API — for larger videos
+          or MOV files, the audio is extracted (mono 16 kHz) before the call.</li>
       <li>We never sell data. There are no ads and no third-party trackers.</li>
     </ul>
 

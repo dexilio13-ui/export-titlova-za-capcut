@@ -37,11 +37,16 @@
         return;
       }
       if (info.maxFileSizeMB) {
-        state.maxMB = info.maxFileSizeMB;
-        UI.elements.limitNote.textContent = "Max file size: " + info.maxFileSizeMB + " MB" +
-          (info.movSupport === false ? " · MOV requires ffmpeg on the server" : "");
+        state.maxMB = info.maxUploadMB || info.maxFileSizeMB;
+        const ffmpeg = info.ffmpeg !== false && info.movSupport !== false;
+        state.movSupport = ffmpeg;
+        UI.elements.limitNote.textContent = ffmpeg
+          ? "MP4 ili MOV · do " + (info.maxUploadMB || info.maxFileSizeMB) +
+            " MB · zvuk se izdvaja automatski"
+          : "Max file size: " + info.maxFileSizeMB + " MB · MP4 only";
+      } else {
+        state.movSupport = info.movSupport;
       }
-      state.movSupport = info.movSupport;
     });
   }
 
