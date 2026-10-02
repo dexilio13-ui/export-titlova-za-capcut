@@ -16,7 +16,7 @@ const { AppError } = require('../utils/errors');
 const logger = require('../utils/logger');
 const { getLimits, decideMediaAction, rejectionMessage, extractionFailureMessage, MB } = require('../utils/limits');
 const { createTempStorage, tempPathFor, removeFile, removeRequestTemp } = require('../utils/tempFiles');
-const { hasFfmpeg, probeDuration, extractAudio } = require('../services/audio');
+const { hasFfmpeg, probeDuration, extractAudio, probeVideoCodec, needsVideoStrip } = require('../services/audio');
 const { transcribe } = require('../services/groq');
 
 const router = express.Router();
@@ -129,7 +129,19 @@ router.post('/transcribe', async (req, res, next) => {
         canExtract: canExtract,
       });
 
-      if (action.action === 'reject') {
+      // Phones record HEVC/H.265, VP9 or AV1. Those files are small, so they
+      // would be forwarded untouched and rejected by the API — strip the video
+      // and send the audio track instead.
+      let plan = action.action;
+      if (plan === 'accept' && canExtract) {
+        const videoCodec = probeVideoCodec(uploadedPath);
+        if (needsVideoStrip(videoCodec)) {
+          logger.info('Extracting audio for unsupported video codec', { codec: videoCodec });
+          plan = 'extract';
+        }
+      }
+
+      if (plan === 'reject') {
         throw new AppError(
           action.reason === 'mov' ? 415 : 413,
           rejectionMessage(action.reason, LIMITS),
@@ -140,7 +152,7 @@ router.post('/transcribe', async (req, res, next) => {
       let fileForGroq = uploadedPath;
       let conversion = null;
 
-      if (action.action === 'extract') {
+      if (plan === 'extract') {
         const startedExtract = Date.now();
         let info;
         try {

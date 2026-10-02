@@ -26,6 +26,15 @@ function mapGroqError(err) {
       code: 'RATE_LIMITED',
     });
   }
+  if (status === 400 && /must be one of the following types|unsupported|decode/i.test(raw)) {
+    // Usually a codec the API cannot read (HEVC/H.265, VP9, AV1, ProRes).
+    return new AppError(
+      415,
+      'This video uses a codec the transcription service cannot read (for example HEVC/H.265). ' +
+        'Please export it as H.264 MP4, or upload it as MOV or over 25 MB so we extract the audio automatically.',
+      { code: 'UNSUPPORTED_CODEC' }
+    );
+  }
   if (status && status >= 500) {
     return new AppError(502, 'Transcription failed. Please check your video and try again.', {
       code: 'GROQ_UPSTREAM',

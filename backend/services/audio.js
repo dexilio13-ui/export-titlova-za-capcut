@@ -121,6 +121,41 @@ function run(bin, args, timeoutMs) {
 const COPYABLE_CODECS = new Set(['aac', 'mp3', 'opus', 'vorbis', 'alac']);
 
 /**
+ * Video codecs the transcription API can usually decode directly. Phones often
+ * record HEVC/H.265, VP9 or AV1 instead, which the API rejects — those files
+ * are routed through audio extraction even when they are small.
+ */
+const FRIENDLY_VIDEO_CODECS = new Set(['h264', 'avc1', 'mpeg4', 'mp4v']);
+
+/**
+ * Reads the first video stream's codec with ffprobe (null when unknown).
+ * @param {string} filePath
+ * @returns {string|null}
+ */
+function probeVideoCodec(filePath) {
+  const ffprobe = resolveFfprobe();
+  if (!ffprobe) return null;
+  try {
+    const out = execFileSync(
+      ffprobe,
+      ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name',
+        '-of', 'default=noprint_wrappers=1:nokey=1', filePath],
+      { timeout: 20000, encoding: 'utf8' }
+    );
+    const codec = String(out).trim().split('\n')[0].toLowerCase();
+    return codec && codec !== 'unknown' && codec !== 'n/a' ? codec : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** True when the video track should be stripped before sending to the API. */
+function needsVideoStrip(codec) {
+  if (!codec) return false;
+  return !FRIENDLY_VIDEO_CODECS.has(codec);
+}
+
+/**
  * Reads the first audio stream's codec with ffprobe (null when unknown).
  * @param {string} filePath
  * @returns {{codecName: string, bitRate: number|null}|null}
@@ -217,5 +252,7 @@ module.exports = {
   probeDuration,
   probeAudioStream,
   chooseStrategy,
+  probeVideoCodec,
+  needsVideoStrip,
   extractAudio,
 };
