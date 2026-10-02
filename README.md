@@ -13,6 +13,11 @@ Edits you make in the web viewer before download are reflected in the imported f
 
 Plain HTML5 + CSS3 + vanilla JS frontend (GitHub Pages ready) · Node.js + Express backend · Groq Speech-to-Text (Whisper). The Groq API key lives **only** on the backend and is never exposed to the browser.
 
+| | |
+|---|---|
+| **Repo** | https://github.com/dexilio13-ui/export-titlova-za-capcut |
+| **Frontend (Pages)** | https://dexilio13-ui.github.io/export-titlova-za-capcut/ |
+
 ```
 User → GitHub Pages (static frontend) → Node.js API → Groq Whisper → JSON timestamps → SRT + TXT
 ```
@@ -104,7 +109,7 @@ The app uses the current Speech-to-Text endpoint `POST https://api.groq.com/open
 | `GROQ_API_KEY` | ✅ | — | Your Groq secret. Server-only, never sent to the browser. |
 | `PORT` | — | `3000` | HTTP port. |
 | `MAX_FILE_SIZE_MB` | — | `25` | Upload cap. Must respect your Groq tier (25 free / 100 dev). |
-| `ALLOWED_ORIGINS` | ✅ (prod) | — | Comma-separated CORS allow-list, e.g. `https://YOUR_USERNAME.github.io`. |
+| `ALLOWED_ORIGINS` | ✅ (prod) | — | Comma-separated CORS allow-list, e.g. `https://dexilio13-ui.github.io`. |
 | `GROQ_MODEL` | — | `whisper-large-v3-turbo` | `whisper-large-v3` for max accuracy. |
 | `FFMPEG_PATH` | — | — | Absolute path to `ffmpeg`. Enables MOV support + audio extraction for large files. |
 | `NODE_ENV` | — | `development` | Set to `production` in deployment (enables strict CORS). |
@@ -119,7 +124,7 @@ The app uses the current Speech-to-Text endpoint `POST https://api.groq.com/open
    - **Root directory:** `backend`
    - **Build command:** `npm install`
    - **Start command:** `npm start`
-4. Add environment variables (`GROQ_API_KEY`, `ALLOWED_ORIGINS=https://YOUR_USERNAME.github.io`, `NODE_ENV=production`, optional `FFMPEG_PATH=/usr/bin/ffmpeg` — Render's native environment does not include ffmpeg by default; without it, upload MP4 only).
+4. Add environment variables (`GROQ_API_KEY`, `ALLOWED_ORIGINS=https://dexilio13-ui.github.io`, `NODE_ENV=production`, optional `FFMPEG_PATH=/usr/bin/ffmpeg` — Render's native environment does not include ffmpeg by default; without it, upload MP4 only).
 5. Deploy. You get `https://your-service.onrender.com`.
 
 Render free services sleep after inactivity — the first request may take ~30 s. Railway (<https://railway.app>) and Fly.io (<https://fly.io>) are drop-in alternatives with the same env-var setup.
@@ -138,7 +143,7 @@ window.APP_CONFIG = {
 };
 ```
 
-6. Make sure the backend's `ALLOWED_ORIGINS` includes `https://YOUR_USERNAME.github.io`.
+6. Make sure the backend's `ALLOWED_ORIGINS` includes `https://dexilio13-ui.github.io`.
 
 ## CORS
 
