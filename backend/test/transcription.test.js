@@ -83,6 +83,38 @@ test('buildFileNames produces video-name.sr.srt and video-name.transcript.txt', 
   assert.strictEqual(n.txt, 'moj-video.transcript.txt');
 });
 
+test('makeBlankSegment appends a 2s empty cue after the last segment', () => {
+  const seg = T.makeBlankSegment([{ start: 0, end: 5 }, { start: 5, end: 9.5 }], 2);
+  assert.deepStrictEqual(seg, { start: 9.5, end: 11.5, text: '', blank: true });
+});
+
+test('makeBlankSegment chains off a previous blank cue', () => {
+  const seg = T.makeBlankSegment([{ start: 9.5, end: 11.5, text: '', blank: true }], 2);
+  assert.strictEqual(seg.start, 11.5);
+  assert.strictEqual(seg.end, 13.5);
+});
+
+test('makeBlankSegment returns null with nothing to extend', () => {
+  assert.strictEqual(T.makeBlankSegment([], 2), null);
+  assert.strictEqual(T.makeBlankSegment(null, 2), null);
+});
+
+test('generateSrt keeps blank cues as timed empty blocks', () => {
+  const srt = T.generateSrt([
+    { start: 0, end: 5, text: 'Poslednja rečenica.' },
+    { start: 5, end: 7, text: '', blank: true },
+  ]);
+  assert.strictEqual(srt, '1\n00:00:00,000 --> 00:00:05,000\nPoslednja rečenica.\n\n2\n00:00:05,000 --> 00:00:07,000\n\n');
+});
+
+test('generateTxt ignores blank cues', () => {
+  const txt = T.generateTxt([
+    { start: 0, end: 5, text: 'Poslednja rečenica.' },
+    { start: 5, end: 7, text: '', blank: true },
+  ]);
+  assert.strictEqual(txt, 'Poslednja rečenica.\n');
+});
+
 test('copyText exists with clipboard fallback', () => {
   assert.strictEqual(typeof T.copyText, 'function');
 });

@@ -63,7 +63,11 @@
   /**
    * Generates a standard SRT file content from segments.
    * Sequential numbering, "HH:MM:SS,mmm" timing, UTF-8 Serbian characters.
-   * @param {Array<{start:number,end:number,text:string}>} segments
+   *
+   * Segments without text are skipped — unless they are explicitly flagged
+   * `blank: true`, which are "silent" cue blocks: timed but empty, used to
+   * extend the subtitle track past the last spoken line.
+   * @param {Array<{start:number,end:number,text:string,blank?:boolean}>} segments
    * @returns {string}
    */
   function generateSrt(segments) {
@@ -72,7 +76,8 @@
     let n = 1;
     for (const seg of segments) {
       const text = (seg.text || "").trim();
-      if (!text) continue;
+      const isBlank = seg.blank === true;
+      if (!text && !isBlank) continue;
       const start = secondsToSrtTime(seg.start);
       const end = secondsToSrtTime(Math.max(seg.end, seg.start));
       blocks.push(`${n}\n${start} --> ${end}\n${text}`);
@@ -89,7 +94,10 @@
    */
   function generateTxt(segments) {
     if (!Array.isArray(segments)) return "";
+    // Blank cue blocks carry no text, so they never belong in the plain
+    // transcript — they exist only to pad the SRT timeline.
     const lines = segments
+      .filter((s) => s.blank !== true)
       .map((s) => (s.text || "").trim())
       .filter(Boolean);
     return lines.join("\n") + (lines.length ? "\n" : "");
@@ -125,6 +133,21 @@
       srt: `${base}.${lang}.srt`,
       txt: `${base}.transcript.txt`,
     };
+  }
+
+  /**
+   * Builds one blank ("silent") cue block of `seconds` length, continuing
+   * right after the last segment of `segments`.
+   * @param {Array<{start:number,end:number}>} segments
+   * @param {number} seconds duration of the blank block
+   * @returns {{start:number,end:number,text:string,blank:true}|null} null when there is nothing to extend
+   */
+  function makeBlankSegment(segments, seconds) {
+    if (!Array.isArray(segments) || segments.length === 0) return null;
+    const dur = Number.isFinite(seconds) && seconds > 0 ? seconds : 2;
+    const last = segments[segments.length - 1];
+    const start = Math.max(Number(last.end) || 0, Number(last.start) || 0);
+    return { start: start, end: start + dur, text: "", blank: true };
   }
 
   /**
@@ -164,6 +187,7 @@
     generateTxt,
     downloadTextFile,
     buildFileNames,
+    makeBlankSegment,
     copyText,
   };
 })();

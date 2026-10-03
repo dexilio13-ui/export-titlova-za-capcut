@@ -536,6 +536,10 @@ select {
   white-space: pre-wrap;
 }
 
+/* Empty ("silent") cue appended by the "+ 2 s prazno" button. */
+.line-card-blank { border-style: dashed; }
+.line-text-empty { color: var(--text-3); font-style: italic; font-size: 0.9rem; }
+
 .line-actions { display: flex; gap: 0.4rem; margin-top: 0.55rem; }
 .line-actions .btn { padding: 0.35rem 0.8rem; font-size: 0.82rem; border-radius: 9px; }
 

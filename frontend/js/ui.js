@@ -36,6 +36,7 @@
       resultsSection: $("resultsSection"),
       downloadSrtBtn: $("downloadSrtBtn"),
       downloadTxtBtn: $("downloadTxtBtn"),
+      addBlankBtn: $("addBlankBtn"),
       copyAllBtn: $("copyAllBtn"),
       newVideoBtn: $("newVideoBtn"),
       timestampsToggle: $("timestampsToggle"),
@@ -251,7 +252,7 @@
     const T = window.TranscriptionLib;
 
     const card = document.createElement("article");
-    card.className = "line-card";
+    card.className = segment.blank ? "line-card line-card-blank" : "line-card";
     card.setAttribute("role", "listitem");
 
     const top = document.createElement("div");
@@ -269,8 +270,8 @@
     top.appendChild(time);
 
     const p = document.createElement("p");
-    p.className = "line-text";
-    p.textContent = segment.text;
+    p.className = segment.blank ? "line-text line-text-empty" : "line-text";
+    p.textContent = segment.blank ? "(prazno — 2 s za titlove)" : segment.text;
 
     const actions = document.createElement("div");
     actions.className = "line-actions";
@@ -281,6 +282,10 @@
     copyBtn.textContent = "Copy";
     copyBtn.setAttribute("aria-label", `Copy line ${index + 1}`);
     copyBtn.addEventListener("click", () => onCopy(index, copyBtn));
+    if (segment.blank) {
+      // Nothing to copy from an empty cue — keep the row honest.
+      copyBtn.disabled = true;
+    }
 
     const editBtn = document.createElement("button");
     editBtn.type = "button";

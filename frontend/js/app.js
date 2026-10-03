@@ -21,6 +21,9 @@
     showTimestamps: true,
   };
 
+  /** Length of each blank cue appended by the "+ 2 s prazno" button. */
+  const BLANK_SECONDS = 2;
+
   /* ── Boot ──────────────────────────────────────────────────────────── */
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -249,6 +252,8 @@
       UI.showToast("TXT downloaded ✓");
     });
 
+    UI.elements.addBlankBtn.addEventListener("click", addBlankSegment);
+
     UI.elements.copyAllBtn.addEventListener("click", async function () {
       if (!state.result) return;
       const ok = await T.copyText(T.generateTxt(currentSegments()));
@@ -270,6 +275,24 @@
     });
   }
 
+  /**
+   * Extends the subtitle track: appends one empty 2-second cue at the end of
+   * the timeline. Click it repeatedly to push the SRT further past the last
+   * spoken line (useful when the video runs longer than the speech).
+   */
+  function addBlankSegment() {
+    if (!state.result) return;
+    const seg = T.makeBlankSegment(state.result.segments, BLANK_SECONDS);
+    if (!seg) {
+      UI.showToast("Nema titlova za nadogradnju");
+      return;
+    }
+    state.result.segments.push(seg);
+    state.edited = true;
+    renderResults({ scroll: false });
+    UI.showToast(`Dodato +${BLANK_SECONDS} s prazno ✓`);
+  }
+
   /** Server language ("sr" / "srp") → two-letter SRT filename tag. */
   function srtLangTag(lang) {
     const l = String(lang || "sr").toLowerCase();
@@ -280,12 +303,14 @@
   function currentSegments() {
     if (!state.result || !Array.isArray(state.result.segments)) return [];
     return state.result.segments.map(function (s) {
-      return { start: s.start, end: s.end, text: s.text };
+      return { start: s.start, end: s.end, text: s.text, blank: s.blank === true };
     });
   }
 
-  function renderResults() {
+  /** @param {{scroll?:boolean}} [opts] scroll:false keeps the viewport still */
+  function renderResults(opts) {
     if (!state.result) return;
+    const shouldScroll = !opts || opts.scroll !== false;
     const T2 = window.TranscriptionLib;
     const list = UI.elements.transcript;
     UI.clearTranscript();
@@ -307,7 +332,12 @@
         },
         onEditSave: function (idx, patch) {
           const seg = state.result.segments[idx];
-          seg.text = (patch.text || "").trim() || seg.text;
+          // An empty text field is ignored: it would silently delete a real cue.
+          const newText = (patch.text || "").trim();
+          if (newText) {
+            seg.text = newText;
+            seg.blank = false; // typed text turns the placeholder into a real cue
+          }
           if (patch.startChanged) seg.start = patch.start;
           if (patch.endChanged) seg.end = patch.end;
           state.edited = true;
@@ -319,13 +349,17 @@
     });
 
     const wordsCount = state.result.words && state.result.words.length > 0 ? state.result.words.length : 0;
+    const blankCount = state.result.segments.filter((s) => s.blank === true).length;
     UI.elements.metaLine.textContent =
       state.result.segments.length + " segments · " +
       (wordsCount > 0 ? wordsCount + " word timestamps kept" : "segment timestamps only") +
+      (blankCount > 0 ? " · " + blankCount + " praznih (" + blankCount * BLANK_SECONDS + " s)" : "") +
       (state.edited ? " · edited" : "");
 
     UI.elements.resultsSection.hidden = false;
-    UI.elements.resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (shouldScroll) {
+      UI.elements.resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   // Expose for tests/debugging (no secrets involved).
